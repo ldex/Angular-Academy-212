@@ -2,7 +2,7 @@ import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormControl } from '@angular/forms';
 import { Observable, EMPTY, combineLatest, Subscription } from 'rxjs';
-import { tap, catchError, startWith, count, flatMap, map, debounceTime, filter } from 'rxjs/operators';
+import { tap, catchError, startWith, count, flatMap, map, debounceTime, filter, first, mergeAll } from 'rxjs/operators';
 
 import { Product } from '../product.interface';
 import { ProductService } from '../product.service';
@@ -18,6 +18,8 @@ export class ProductListComponent implements OnInit {
   title: string = 'Products';
   selectedProduct: Product;
   products$: Observable<Product[]>;
+  mostExpensiveProduct$: Observable<Product>;
+  productsNumber$: Observable<number>;
   errorMessage;
 
   // Pagination
@@ -62,6 +64,24 @@ export class ProductListComponent implements OnInit {
     this.products$ = this
                       .productService
                       .products$;
+
+    this.mostExpensiveProduct$ = this
+                                  .products$
+                                  .pipe(
+                                    map(products => [...products].sort((p1, p2) => p1.price > p2.price ? -1 : 1)),
+                                    // [5]
+                                    mergeAll(),
+                                    // {}, {}, {}, {}, {}
+                                    first()
+                                    // {}
+                                  );
+
+    this.productsNumber$ = this
+                              .products$
+                              .pipe(
+                                map(products => products.length),
+                                startWith(0)
+                              );
   }
 
   refresh() {
