@@ -1,8 +1,8 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormControl } from '@angular/forms';
-import { Observable, EMPTY, combineLatest, Subscription } from 'rxjs';
-import { tap, catchError, startWith, count, flatMap, map, debounceTime, filter, first, mergeAll } from 'rxjs/operators';
+import { Observable, EMPTY, combineLatest, Subscription, of } from 'rxjs';
+import { tap, catchError, startWith, count, flatMap, map, debounceTime, filter, first, mergeAll, switchMap } from 'rxjs/operators';
 
 import { Product } from '../product.interface';
 import { ProductService } from '../product.service';
@@ -20,13 +20,23 @@ export class ProductListComponent implements OnInit {
   products$: Observable<Product[]>;
   mostExpensiveProduct$: Observable<Product>;
   productsNumber$: Observable<number>;
+  productsTotalNumber$: Observable<number>;
   errorMessage;
+  
 
   // Pagination
   pageSize = 5;
+  productsToLoad = this.pageSize * 2;
   start = 0;
   end = this.pageSize;
   currentPage = 1;
+
+  loadMore() {
+    let take = this.productsToLoad;
+    let skip = this.end;
+
+    this.productService.initProducts(skip, take);
+  }
 
   previousPage() {
     this.start -= this.pageSize;
@@ -66,14 +76,20 @@ export class ProductListComponent implements OnInit {
                       .products$;
 
     this.mostExpensiveProduct$ = this
-                                  .products$
+                                  .products$                                  
                                   .pipe(
-                                    map(products => [...products].sort((p1, p2) => p1.price > p2.price ? -1 : 1)),
-                                    // [5]
-                                    mergeAll(),
-                                    // {}, {}, {}, {}, {}
-                                    first()
-                                    // {}
+                                    filter(products => products.length != 0),
+                                    switchMap(
+                                      products => of(products)
+                                                  .pipe(
+                                                    map(products => [...products].sort((p1, p2) => p1.price > p2.price ? -1 : 1)),
+                                                    // [5]
+                                                    mergeAll(),
+                                                    // {}, {}, {}, {}, {}
+                                                    first()
+                                                    // {}
+                                                  )
+                                    )                                    
                                   );
 
     this.productsNumber$ = this
@@ -82,6 +98,10 @@ export class ProductListComponent implements OnInit {
                                 map(products => products.length),
                                 startWith(0)
                               );
+
+    this.productsTotalNumber$ = this
+                                    .productService
+                                    .productsTotalNumber$;
   }
 
   refresh() {
